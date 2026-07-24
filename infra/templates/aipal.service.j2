@@ -1,0 +1,17 @@
+[Unit]
+Description=AIpal FastAPI service
+After=network.target docker.service
+
+[Service]
+Type=simple
+User={{ aipal_service_user }}
+Group={{ aipal_service_user }}
+WorkingDirectory={{ aipal_deploy_dir }}/mvp/backend
+Environment=AIPAL_DATA_DIR={{ aipal_data_dir }}
+EnvironmentFile=/etc/default/aipal
+ExecStart={{ aipal_deploy_dir }}/mvp/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8101
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

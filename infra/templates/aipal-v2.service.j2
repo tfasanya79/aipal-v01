@@ -1,0 +1,14 @@
+[Unit]
+Description=AIpal API v2
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User={{ aipal_service_user }}
+WorkingDirectory={{ aipal_v2_deploy_dir }}/apps/api
+EnvironmentFile=-/etc/default/aipal-v2
+ExecStart={{ aipal_v2_deploy_dir }}/apps/api/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port {{ aipal_v2_port }}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

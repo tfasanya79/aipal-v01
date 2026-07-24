@@ -1,0 +1,30 @@
+default_platform(:android)
+
+platform :android do
+  desc "Build release AAB for Play Internal"
+  lane :internal do
+    sh("cd .. && flutter build appbundle --release --dart-define=API_BASE_URL=https://43.160.220.9.sslip.io/api/v2")
+  end
+
+  desc "Upload AAB to Play Internal testing track"
+  lane :upload_internal do |options|
+    aab = options[:aab] || ENV["AAB_PATH"]
+    upload_to_play_store(
+      track: "internal",
+      release_status: "completed",
+      aab: aab,
+      package_name: "io.aipal.mvp",
+      json_key: "/home/dev/aipal/.secrets/play-api.json",
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+end
+
+platform :ios do
+  desc "Build IPA for TestFlight (requires macOS)"
+  lane :testflight do
+    sh("cd .. && flutter build ipa --release --dart-define=API_BASE_URL=https://43.160.220.9.sslip.io/api/v2")
+  end
+end

@@ -1,0 +1,101 @@
+---
+- name: Deploy AIpal v2 API
+  hosts: tencent_vm
+  become: true
+  vars:
+    aipal_v2_deploy_dir: /opt/aipal-v2
+    aipal_v2_port: 8102
+    aipal_service_user: teems
+
+  tasks:
+    - name: Ensure v2 deploy directory
+      ansible.builtin.file:
+        path: "{{ aipal_v2_deploy_dir }}/apps/api"
+        state: directory
+        owner: "{{ aipal_service_user }}"
+        mode: "0755"
+
+    - name: Sync v2 API source
+      ansible.posix.synchronize:
+        src: "{{ playbook_dir }}/../../apps/api/"
+        dest: "{{ aipal_v2_deploy_dir }}/apps/api/"
+        delete: true
+        rsync_opts:
+          - "--exclude=.venv"
+          - "--exclude=.env"
+          - "--exclude=__pycache__"
+      become: false
+
+    - name: Create venv
+      ansible.builtin.command:
+        cmd: python3 -m venv .venv
+        chdir: "{{ aipal_v2_deploy_dir }}/apps/api"
+        creates: "{{ aipal_v2_deploy_dir }}/apps/api/.venv"
+      become_user: "{{ aipal_service_user }}"
+
+    - name: Install requirements
+      ansible.builtin.pip:
+        requirements: "{{ aipal_v2_deploy_dir }}/apps/api/requirements.txt"
+        virtualenv: "{{ aipal_v2_deploy_dir }}/apps/api/.venv"
+      become_user: "{{ aipal_service_user }}"
+
+    - name: Require production environment file
+      ansible.builtin.stat:
+        path: /etc/default/aipal-v2
+      register: aipal_v2_environment
+
+    - name: Fail when production environment is missing
+      ansible.builtin.fail:
+        msg: /etc/default/aipal-v2 is required before migrations or model preload
+      when: not aipal_v2_environment.stat.exists
+
+    - name: Run database migrations before service restart
+      ansible.builtin.shell: |
+        set -a
+        source /etc/default/aipal-v2
+        set +a
+        .venv/bin/alembic upgrade head
+      args:
+        chdir: "{{ aipal_v2_deploy_dir }}/apps/api"
+        executable: /bin/bash
+      become_user: "{{ aipal_service_user }}"
+      changed_when: false
+
+    - name: Preload and validate semantic embedding model
+      ansible.builtin.shell: |
+        set -a
+        source /etc/default/aipal-v2
+        set +a
+        .venv/bin/python scripts/preload_embedding_model.py
+      args:
+        chdir: "{{ aipal_v2_deploy_dir }}/apps/api"
+        executable: /bin/bash
+      become_user: "{{ aipal_service_user }}"
+      changed_when: false
+
+    - name: Backfill semantic memory projection
+      ansible.builtin.shell: |
+        set -a
+        source /etc/default/aipal-v2
+        set +a
+        .venv/bin/python scripts/backfill_memory_index.py
+      args:
+        chdir: "{{ aipal_v2_deploy_dir }}/apps/api"
+        executable: /bin/bash
+      become_user: "{{ aipal_service_user }}"
+      changed_when: false
+
+    - name: Install systemd unit for v2
+      ansible.builtin.template:
+        src: aipal-v2.service.j2
+        dest: /etc/systemd/system/aipal-v2.service
+        mode: "0644"
+      notify: restart aipal-v2
+
+  handlers:
+    - name: restart aipal-v2
+      ansible.builtin.systemd:
+        name: aipal-v2
+        state: restarted
+        enabled: true
+        daemon_reload: true

@@ -1,0 +1,160 @@
+---
+- name: Deploy AIpal app stack
+  hosts: tencent_vm
+  become: true
+  vars:
+    app_packages:
+      - python3-venv
+      - python3-pip
+      - ffmpeg
+      - espeak-ng
+      - nodejs
+      - npm
+      - caddy
+      - docker.io
+      - docker-compose-v2
+      - rsync
+
+  tasks:
+    - name: Install app/runtime packages
+      ansible.builtin.apt:
+        name: "{{ app_packages }}"
+        state: present
+        update_cache: true
+
+    - name: Ensure deploy directory exists
+      ansible.builtin.file:
+        path: "{{ aipal_deploy_dir }}"
+        state: directory
+        owner: "{{ aipal_service_user }}"
+        group: "{{ aipal_service_user }}"
+        mode: "0755"
+
+    - name: Sync project files to VM
+      ansible.posix.synchronize:
+        src: "{{ aipal_repo_src }}/"
+        dest: "{{ aipal_deploy_dir }}/"
+        delete: true
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=.cursor"
+          - "--exclude=node_modules"
+          - "--exclude=.venv"
+          - "--exclude=.dev-logs"
+      become: false
+
+    - name: Create app data directory
+      ansible.builtin.file:
+        path: "{{ aipal_data_dir }}"
+        state: directory
+        owner: "{{ aipal_service_user }}"
+        group: "{{ aipal_service_user }}"
+        mode: "0755"
+
+    - name: Create backend virtual environment
+      ansible.builtin.command:
+        cmd: python3 -m venv .venv
+        chdir: "{{ aipal_deploy_dir }}/mvp/backend"
+      become_user: "{{ aipal_service_user }}"
+      changed_when: false
+
+    - name: Install backend requirements
+      ansible.builtin.pip:
+        requirements: "{{ aipal_deploy_dir }}/requirements.txt"
+        virtualenv: "{{ aipal_deploy_dir }}/mvp/backend/.venv"
+        virtualenv_command: "python3 -m venv"
+      become_user: "{{ aipal_service_user }}"
+
+    - name: Install frontend dependencies
+      ansible.builtin.command:
+        cmd: npm ci
+        chdir: "{{ aipal_deploy_dir }}/mvp/frontend"
+      become_user: "{{ aipal_service_user }}"
+      changed_when: false
+
+    - name: Build frontend bundle
+      ansible.builtin.command:
+        cmd: npm run build
+        chdir: "{{ aipal_deploy_dir }}/mvp/frontend"
+      become_user: "{{ aipal_service_user }}"
+
+    - name: Ensure Docker service is enabled
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Start Ollama container
+      ansible.builtin.command:
+        cmd: docker compose up -d ollama
+        chdir: "{{ aipal_deploy_dir }}"
+      changed_when: false
+
+    - name: Pull configured Ollama model
+      ansible.builtin.command:
+        cmd: docker compose exec -T ollama ollama pull {{ aipal_ollama_model }}
+        chdir: "{{ aipal_deploy_dir }}"
+      changed_when: false
+
+    - name: Install AIpal environment file
+      ansible.builtin.template:
+        src: ../templates/aipal.env.j2
+        dest: /etc/default/aipal
+        owner: root
+        group: root
+        mode: "0600"
+      notify: Restart aipal
+
+    - name: Install AIpal systemd service
+      ansible.builtin.template:
+        src: ../templates/aipal.service.j2
+        dest: /etc/systemd/system/aipal.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - Reload systemd
+        - Restart aipal
+
+    - name: Install Caddy configuration
+      ansible.builtin.template:
+        src: ../templates/Caddyfile.j2
+        dest: /etc/caddy/Caddyfile
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart caddy
+
+    - name: Enable and start AIpal service
+      ansible.builtin.systemd:
+        name: aipal
+        state: started
+        enabled: true
+
+    - name: Allow HTTP in UFW
+      community.general.ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+
+    - name: Allow HTTPS in UFW
+      community.general.ufw:
+        rule: allow
+        port: "443"
+        proto: tcp
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+      listen: Reload systemd
+
+    - name: Restart caddy
+      ansible.builtin.systemd:
+        name: caddy
+        state: restarted
+
+    - name: Restart aipal
+      ansible.builtin.systemd:
+        name: aipal
+        state: restarted

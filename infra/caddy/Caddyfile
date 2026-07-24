@@ -1,0 +1,37 @@
+43.160.220.9.sslip.io, 43.160.220.9.nip.io {
+    encode zstd gzip
+
+    handle /api/v2/* {
+        reverse_proxy 127.0.0.1:8102
+    }
+
+    handle_path /downloads/* {
+        root * /var/www/aipal-downloads
+        @apk path *.apk
+        header @apk Content-Disposition "attachment; filename=\"aipal-latest.apk\""
+        file_server
+    }
+
+    handle_path /app/* {
+        root * /var/www/aipal-v2-web
+        try_files {path} /index.html
+        file_server
+    }
+
+    handle_path /status/* {
+        root * /var/www/aipal-status
+        basicauth /* {
+            {env.STATUS_AUTH_USER} {env.STATUS_AUTH_HASH}
+        }
+        file_server
+    }
+
+    @root path /
+    handle @root {
+        redir * /app/ 302
+    }
+
+    handle {
+        redir * /app/ 302
+    }
+}

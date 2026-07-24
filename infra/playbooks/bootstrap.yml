@@ -1,0 +1,62 @@
+---
+- name: Bootstrap and harden Ubuntu VM
+  hosts: tencent_vm
+  become: true
+  vars:
+    sshd_config_path: /etc/ssh/sshd_config.d/99-hardening.conf
+
+  tasks:
+    - name: Ensure apt cache is updated
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Upgrade all packages
+      ansible.builtin.apt:
+        upgrade: dist
+
+    - name: Install baseline packages
+      ansible.builtin.apt:
+        name: "{{ common_packages }}"
+        state: present
+
+    - name: Set system timezone
+      community.general.timezone:
+        name: "{{ timezone }}"
+
+    - name: Configure SSH hardening drop-in
+      ansible.builtin.copy:
+        dest: "{{ sshd_config_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          PermitRootLogin {{ sshd_hardening.permit_root_login }}
+          PasswordAuthentication {{ sshd_hardening.password_authentication }}
+          PubkeyAuthentication yes
+          ChallengeResponseAuthentication no
+          UsePAM yes
+      notify: Restart ssh
+
+    - name: Allow OpenSSH in UFW
+      community.general.ufw:
+        rule: allow
+        name: OpenSSH
+
+    - name: Enable UFW with deny incoming policy
+      community.general.ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    - name: Enable fail2ban service
+      ansible.builtin.systemd:
+        name: fail2ban
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart ssh
+      ansible.builtin.systemd:
+        name: ssh
+        state: restarted

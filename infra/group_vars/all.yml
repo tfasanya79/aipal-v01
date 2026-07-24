@@ -1,0 +1,26 @@
+---
+timezone: "UTC"
+common_packages:
+  - curl
+  - git
+  - htop
+  - fail2ban
+  - ufw
+sshd_hardening:
+  permit_root_login: "prohibit-password"
+  password_authentication: "no"
+
+# App deployment defaults
+aipal_domains:
+  - "43.160.220.9.sslip.io"
+  - "43.160.220.9.nip.io"
+aipal_repo_src: "/mnt/c/Users/teems/Downloads/Claude-Cowork-OS/AIpal_Project"
+aipal_deploy_dir: "/opt/aipal"
+aipal_service_user: "teems"
+aipal_data_dir: "/var/lib/aipal"
+aipal_ollama_model: "llama3.2:3b"
+aipal_ollama_base_url: "http://127.0.0.1:11434"
+aipal_llm_provider: "deepseek"
+aipal_deepseek_api_key: "{{ lookup('env', 'DEEPSEEK_API_KEY') }}"
+aipal_deepseek_model: "deepseek-chat"
+aipal_deepseek_api_base: "https://api.deepseek.com"

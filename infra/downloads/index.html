@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AiPal — Download APK</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      max-width: 640px;
+      margin: 2rem auto;
+      padding: 0 1.25rem;
+      line-height: 1.5;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .meta { color: #8b949e; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    a.btn {
+      display: inline-block;
+      background: #e8a838;
+      color: #0d1117;
+      font-weight: 600;
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      text-decoration: none;
+      margin: 0.5rem 0 1.5rem;
+    }
+    a.btn:hover { filter: brightness(1.08); }
+    ol { padding-left: 1.25rem; }
+    li { margin-bottom: 0.5rem; }
+    .warn {
+      background: #161b22;
+      border: 1px solid #e8a83855;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+    code {
+      background: #161b22;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      word-break: break-all;
+    }
+    .web-link { margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>AiPal Android APK</h1>
+  <p class="meta">Sideload build for testing — version <strong id="version">2.0.0 (build 10)</strong></p>
+
+  <a class="btn" href="aipal-latest.apk" download="aipal-v2.0.0-v9.apk">Download APK</a>
+
+  <div class="warn">
+    <strong>Install fails or app won't open?</strong>
+    Uninstall AiPal from the Play Store first (same package <code>io.aipal.mvp</code>, different signing key), then install this APK.
+  </div>
+
+  <h2>Install steps</h2>
+  <ol>
+    <li>Uninstall any existing AiPal app from your phone.</li>
+    <li>Download the APK using the button above.</li>
+    <li>Open the downloaded file and allow installation from this source if prompted.</li>
+    <li>Launch AiPal → Settings → confirm <strong>2.0.0 (build 10)</strong>.</li>
+    <li>Companion → tap the orb once → speak naturally.</li>
+  </ol>
+
+  <p>SHA-256: <code id="sha256">(computed on deploy)</code></p>
+
+  <p class="web-link">Prefer browser? <a href="/app/">Open the web app</a> — voice works there too.</p>
+
+  <script>
+    fetch('aipal-latest.apk', { method: 'HEAD' }).catch(() => {});
+  </script>
+</body>
+</html>
